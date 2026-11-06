@@ -1,5 +1,14 @@
 # 🛡️ FraudShield AI
 
+[![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-passing-brightgreen?style=flat-square&logo=githubactions)](.github/workflows/ci.yml)
+[![Tests Passing](https://img.shields.io/badge/Tests-77%20passed%20%7C%20100%25-brightgreen?style=flat-square&logo=pytest)](docs/TESTING_REPORT.md)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React 18](https://img.shields.io/badge/React-18.2-61dafb?style=flat-square&logo=react)](https://react.dev/)
+[![Chrome Extension](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square&logo=googlechrome)](browser-extension/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed?style=flat-square&logo=docker)](docker-compose.yml)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+
 > **AI-Powered Browser Cyber Threat Detection, Prevention, Explainable Intelligence, Multi-Device Threat Correlation, and Digital Forensics Platform**
 
 ---
@@ -109,6 +118,19 @@ Traditional browser security mechanisms rely almost entirely on static domain re
                                │  (React 18 • TypeScript)    │
                                └─────────────────────────────┘
 ```
+
+---
+
+## 📂 Repository Structure & Dedicated Guides
+
+FraudShield AI is organized as a decoupled mono-repository with dedicated documentation for each tier:
+
+| Sub-Module / Directory | Technology Stack | Description | Dedicated Guide |
+| :--- | :--- | :--- | :--- |
+| **[backend/](backend/)** | Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic, Scikit-learn, SHAP | ASGI asynchronous API, hybrid heuristic scoring engines, ML classifier, forensic parsers, and connection pool. | 📖 **[Backend Guide](backend/README.md)** |
+| **[admin-dashboard/](admin-dashboard/)** | React 18, TypeScript, Vite 5, Tailwind CSS, Recharts | Enterprise SOC web console featuring 10 operational views, real-time WebSockets, and zero-execution file forensics. | 📖 **[Admin Dashboard Guide](admin-dashboard/README.md)** |
+| **[browser-extension/](browser-extension/)** | Chrome Manifest V3, React 18, TypeScript, Tailwind CSS | Client endpoint defense featuring offline blocklist cache, DOM signal heuristics, Safe Exit, and download interceptor. | 📖 **[Extension Guide](browser-extension/README.md)** |
+| **[docs/](docs/)** | Markdown, Mermaid | Comprehensive technical documentation hub covering architecture, scalability, security audits, and benchmarks. | 📚 **[Documentation Hub](docs/README.md)** |
 
 ---
 
@@ -293,26 +315,24 @@ tests/test_url_normalization.py::test_url_hash PASSED
 
 ## 📚 Technical Documentation & System Guides
 
-Comprehensive architecture, API specifications, security hardening guides, and operational runbooks are located in the [`docs/`](file:///d:/FraudShield%20AI/docs/) directory:
+Comprehensive architecture, API specifications, security hardening guides, and operational runbooks are located in the [`docs/`](docs/) directory:
 
-- 🏛️ **[Architecture Specification](file:///d:/FraudShield%20AI/docs/ARCHITECTURE.md)**: Modular monolith, engine registry, circuit breakers, and data flows.
-- 📈 **[Scalability Plan](file:///d:/FraudShield%20AI/docs/SCALABILITY_PLAN.md)**: 100k+ extensions roadmap, multi-tier caching, and connection pooling.
-- 🛡️ **[Reliability & Recovery Guide](file:///d:/FraudShield%20AI/docs/RELIABILITY_AND_RECOVERY.md)**: Fault-tolerance matrix, timeouts, and graceful degradation.
-- 🔒 **[Security Hardening Guide](file:///d:/FraudShield%20AI/docs/SECURITY_HARDENING.md)**: BOLA, SSRF, XXE, rate limiting, and formula injection mitigations.
-- 🗄️ **[Database Architecture](file:///d:/FraudShield%20AI/docs/DATABASE_DESIGN.md)**: ER diagrams, schemas, indexing, and Alembic migrations.
-- 📡 **[REST API & WebSockets](file:///d:/FraudShield%20AI/docs/API_DOCUMENTATION.md)**: OpenAPI endpoints, health probes, tracing, and error schemas.
-- 🚀 **[Deployment Guide](file:///d:/FraudShield%20AI/docs/DEPLOYMENT_GUIDE.md)**: Docker Compose, Kubernetes manifests, and production checklist.
-- 📊 **[Observability & Monitoring](file:///d:/FraudShield%20AI/docs/MONITORING_GUIDE.md)**: Structured JSON logging, Prometheus metrics, and alert rules.
-- 🧪 **[Automated Test Report](file:///d:/FraudShield%20AI/docs/TESTING_REPORT.md)**: Complete analysis of all 77 test cases (100% pass rate).
-- ⚡ **[Performance Benchmark Report](file:///d:/FraudShield%20AI/docs/PERFORMANCE_REPORT.md)**: Empirical throughput (30.36 RPS) and latency percentiles.
-- 🚨 **[Disaster Recovery Plan](file:///d:/FraudShield%20AI/docs/DISASTER_RECOVERY_PLAN.md)**: RPO/RTO objectives, continuous WAL backups, and failover runbooks.
-- 📝 **[Persistent Update Ledger](file:///d:/FraudShield%20AI/docs/UPDATE_LOG.md)**: Chronological update audit trail.
-- 📜 **[Project Changelog](file:///d:/FraudShield%20AI/docs/CHANGELOG.md)**: Versioned release notes.
+- 🏛️ **[Architecture Specification](docs/ARCHITECTURE.md)**: Modular monolith, engine registry, circuit breakers, and data flows.
+- 📈 **[Scalability Plan](docs/SCALABILITY_PLAN.md)**: 100k+ extensions roadmap, multi-tier caching, and connection pooling.
+- 🛡️ **[Reliability & Recovery Guide](docs/RELIABILITY_AND_RECOVERY.md)**: Fault-tolerance matrix, timeouts, and graceful degradation.
+- 🔒 **[Security Hardening Guide](docs/SECURITY_HARDENING.md)**: BOLA, SSRF, XXE, rate limiting, and formula injection mitigations.
+- 🗄️ **[Database Architecture](docs/DATABASE_DESIGN.md)**: ER diagrams, schemas, indexing, and Alembic migrations.
+- 📡 **[REST API & WebSockets](docs/API_DOCUMENTATION.md)**: OpenAPI endpoints, health probes, tracing, and error schemas.
+- 🚀 **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)**: Docker Compose, Kubernetes manifests, and production checklist.
+- 📊 **[Observability & Monitoring](docs/MONITORING_GUIDE.md)**: Structured JSON logging, Prometheus metrics, and alert rules.
+- 🧪 **[Automated Test Report](docs/TESTING_REPORT.md)**: Complete analysis of all 77 test cases (100% pass rate).
+- ⚡ **[Performance Benchmark Report](docs/PERFORMANCE_REPORT.md)**: Empirical throughput (30.36 RPS) and latency percentiles.
+- 🚨 **[Disaster Recovery Plan](docs/DISASTER_RECOVERY_PLAN.md)**: RPO/RTO objectives, continuous WAL backups, and failover runbooks.
+- 📝 **[Persistent Update Ledger](docs/UPDATE_LOG.md)**: Chronological update audit trail.
+- 📜 **[Project Changelog](docs/CHANGELOG.md)**: Versioned release notes.
 
 ---
 
 ## 📄 License
 FraudShield AI is developed as an open research and engineering project for advanced browser cyber threat defense. Licensed under the MIT License.
 
-#   F r a u d S h e i l d - A I  
- 
