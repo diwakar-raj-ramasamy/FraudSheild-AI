@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "FraudShield AI - Cyber Threat Defense",
+  "version": "1.0.0",
+  "description": "AI-Powered Browser Cyber Threat Detection, Prevention, Explainable AI & Safe Exit Protection",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "webNavigation",
+    "downloads",
+    "alarms"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "FraudShield AI Protection"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/safe-exit/index.html",
+        "src/warning/index.html",
+        "assets/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+

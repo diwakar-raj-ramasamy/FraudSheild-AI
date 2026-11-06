@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fraudshield_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fraudshield_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraudshield_postgres_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-fraudshield_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fraudshield_user} -d ${POSTGRES_DB:-fraudshield_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: fraudshield_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-redis_secure_pass_2026}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_pass_2026}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fraudshield_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-fraudshield_user}:${POSTGRES_PASSWORD:-fraudshield_postgres_secure_pass_2026}@db:5432/${POSTGRES_DB:-fraudshield_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass_2026}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-fraudshield_super_secret_jwt_key_minimum_32_bytes_2026}
+      - ENVIRONMENT=production
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:80}
+      - SAFE_SCORE_MAX=39
+      - CAUTION_SCORE_MAX=69
+      - MIN_DEVICES_FOR_CAMPAIGN=2
+      - CAMPAIGN_WINDOW_SECONDS=3600
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+
+  dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+    container_name: fraudshield_dashboard
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+
+volumes:
+  postgres_data:
+  redis_data:
