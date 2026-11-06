@@ -127,3 +127,4 @@ pytest tests/ --cov=app --cov-report=term-missing
 # Run high-concurrency performance benchmark (30+ RPS)
 python load_tests/async_load_runner.py
 ```
+
