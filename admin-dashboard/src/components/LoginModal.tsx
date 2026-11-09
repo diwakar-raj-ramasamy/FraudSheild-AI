@@ -24,7 +24,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onLoginSuccess }
       await api.login(email, password);
       onLoginSuccess();
     } catch (err: any) {
-      setError(err.message || "Invalid authentication credentials");
+      const msg = err.message || "";
+      if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("networkerror")) {
+        setError("Cannot connect to FraudShield Backend (http://localhost:8000). Please ensure the backend server is running in your terminal.");
+      } else {
+        setError(msg || "Invalid authentication credentials");
+      }
     } finally {
       setLoading(false);
     }
