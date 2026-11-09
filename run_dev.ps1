@@ -10,6 +10,7 @@ function Show-Menu {
     Write-Host "    [FRAUDSHIELD AI] PRODUCTION CONTROL CENTER & SERVICE LAUNCHER        " -ForegroundColor Cyan
     Write-Host "=========================================================================" -ForegroundColor Cyan
     Write-Host ""
+    Write-Host "  [0] Launch Full Platform (Backend + Admin Dashboard in Separate Windows)" -ForegroundColor Green
     Write-Host "  [1] Start Backend API Server (FastAPI + Uvicorn on :8000)" -ForegroundColor White
     Write-Host "  [2] Start Admin SOC Dashboard (React + Vite on :5173)" -ForegroundColor White
     Write-Host "  [3] Run Complete Automated Test Suite (77 Tests)" -ForegroundColor White
@@ -25,14 +26,27 @@ function Show-Menu {
 
 do {
     Show-Menu
-    $choice = Read-Host "Enter your selection [1-9]"
+    $choice = Read-Host "Enter your selection [0-9]"
     switch ($choice) {
+        "0" {
+            Clear-Host
+            Write-Host "=========================================================================" -ForegroundColor Cyan
+            Write-Host "  Launching FraudShield AI Full Stack (Backend + Dashboard)..." -ForegroundColor Cyan
+            Write-Host "=========================================================================" -ForegroundColor Cyan
+            Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd '$ROOT\backend'; & '$ROOT\backend\venv\Scripts\python.exe' -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+            Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd '$ROOT\admin-dashboard'; npm run dev"
+            Write-Host "`nBackend API launched on: http://localhost:8000 (Swagger docs at /docs)" -ForegroundColor Green
+            Write-Host "Admin Dashboard launched on: http://localhost:5173" -ForegroundColor Green
+            Write-Host "`nOpening browser in 4 seconds..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 4
+            Start-Process "http://localhost:5173"
+            Pause
+        }
         "1" {
             Clear-Host
             Write-Host "Starting Backend API on http://localhost:8000 ..." -ForegroundColor Green
             Set-Location "$ROOT\backend"
-            & ".\venv\Scripts\Activate.ps1"
-            python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+            & "$ROOT\backend\venv\Scripts\python.exe" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
             Pause
         }
         "2" {
@@ -60,8 +74,7 @@ do {
             Clear-Host
             Write-Host "Applying Database Migrations to Head..." -ForegroundColor Green
             Set-Location "$ROOT\backend"
-            & ".\venv\Scripts\Activate.ps1"
-            alembic upgrade head
+            & "$ROOT\backend\venv\Scripts\alembic.exe" upgrade head
             Write-Host "`nDatabase schema is at HEAD." -ForegroundColor Green
             Pause
         }

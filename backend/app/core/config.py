@@ -1,6 +1,7 @@
 import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
@@ -17,6 +18,19 @@ class Settings(BaseSettings):
     
     # Database (defaults to local SQLite for zero-config run, supports PostgreSQL via env)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./fraudshield.db")
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def resolve_sqlite_path(cls, v: str) -> str:
+        """
+        Anchors relative SQLite database paths to the project root directory
+        so database access is 100% consistent regardless of execution working directory.
+        """
+        if isinstance(v, str) and (v.startswith("sqlite:///./") or v == "sqlite:///fraudshield.db"):
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            db_path = os.path.join(base_dir, "fraudshield.db").replace("\\", "/")
+            return f"sqlite:///{db_path}"
+        return v
     
     # CORS (Strict allowed origins - no wildcard origins)
     BACKEND_CORS_ORIGINS: List[str] = [

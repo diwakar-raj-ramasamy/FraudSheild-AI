@@ -59,14 +59,23 @@ export const App: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // WebSocket Live Bus
+  // WebSocket Live Bus - Only connects when authenticated to prevent unauthorized closed connection loops
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     let ws: WebSocket | null = null;
     let reconnectTimeout: any = null;
+    let isCancelled = false;
 
     const connectWs = () => {
+      if (isCancelled) return;
       try {
-        ws = new WebSocket("ws://localhost:8000/api/ws/events");
+        const token = api.getAuthToken();
+        const wsUrl = token
+          ? `ws://localhost:8000/api/ws/events?token=${encodeURIComponent(token)}`
+          : "ws://localhost:8000/api/ws/events";
+
+        ws = new WebSocket(wsUrl);
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -87,7 +96,9 @@ export const App: React.FC = () => {
           }
         };
         ws.onclose = () => {
-          reconnectTimeout = setTimeout(connectWs, 5000);
+          if (!isCancelled) {
+            reconnectTimeout = setTimeout(connectWs, 5000);
+          }
         };
       } catch {
         // Fallback
@@ -96,10 +107,11 @@ export const App: React.FC = () => {
 
     connectWs();
     return () => {
+      isCancelled = true;
       if (ws) ws.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const handleNavigateToInvestigation = (threatId?: string) => {
     if (threatId) {

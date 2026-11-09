@@ -82,6 +82,10 @@ export const api = {
     return !!getAuthToken();
   },
 
+  getAuthToken: (): string | null => {
+    return getAuthToken();
+  },
+
   // Metrics
   getMetricsOverview: () => fetchJson<MetricsOverviewResponse>("/metrics/overview"),
 
