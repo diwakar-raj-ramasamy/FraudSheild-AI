@@ -49,14 +49,18 @@ def test_alert_resolution_requires_admin(client, admin_headers, db):
     db.commit()
     db.refresh(alert)
 
-    # Unauthenticated resolution attempt fails
-    unauth_res = client.patch(f"/api/alerts/{alert.id}", json={"is_resolved": True})
-    assert unauth_res.status_code == 401
+    try:
+        # Unauthenticated resolution attempt fails
+        unauth_res = client.patch(f"/api/alerts/{alert.id}", json={"is_resolved": True})
+        assert unauth_res.status_code == 401
 
-    # Admin resolution succeeds
-    admin_res = client.patch(f"/api/alerts/{alert.id}", json={"is_resolved": True}, headers=admin_headers)
-    assert admin_res.status_code == 200
-    assert admin_res.json()["is_resolved"] is True
+        # Admin resolution succeeds
+        admin_res = client.patch(f"/api/alerts/{alert.id}", json={"is_resolved": True}, headers=admin_headers)
+        assert admin_res.status_code == 200
+        assert admin_res.json()["is_resolved"] is True
+    finally:
+        db.delete(alert)
+        db.commit()
 
 def test_campaign_mitigation_requires_admin(client, admin_headers, db):
     # Create test campaign
@@ -71,19 +75,24 @@ def test_campaign_mitigation_requires_admin(client, admin_headers, db):
     db.commit()
     db.refresh(camp)
 
-    # Unauthenticated mitigation fails
-    unauth = client.post(f"/api/campaigns/{camp.id}/block")
-    assert unauth.status_code == 401
+    try:
+        # Unauthenticated mitigation fails
+        unauth = client.post(f"/api/campaigns/{camp.id}/block")
+        assert unauth.status_code == 401
 
-    # Admin mitigation succeeds
-    res = client.post(f"/api/campaigns/{camp.id}/block", headers=admin_headers)
-    assert res.status_code == 200
-    assert res.json()["status"] == "success"
+        # Admin mitigation succeeds
+        res = client.post(f"/api/campaigns/{camp.id}/block", headers=admin_headers)
+        assert res.status_code == 200
+        assert res.json()["status"] == "success"
 
-    # Verify domain was added to blocklist
-    blocked = db.query(BlocklistEntry).filter(
-        BlocklistEntry.target == "phish-bank-auth-2026.net",
-        BlocklistEntry.is_active == True
-    ).first()
-    assert blocked is not None
+        # Verify domain was added to blocklist
+        blocked = db.query(BlocklistEntry).filter(
+            BlocklistEntry.target == "phish-bank-auth-2026.net",
+            BlocklistEntry.is_active == True
+        ).first()
+        assert blocked is not None
+    finally:
+        db.query(BlocklistEntry).filter(BlocklistEntry.target == "phish-bank-auth-2026.net").delete()
+        db.delete(camp)
+        db.commit()
 

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "FraudShield AI - Browser Cyber Threat Detection, Prevention, Explainable AI & Safe Exit Protection",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -61,8 +61,4 @@ browser-extension/dist/
 .DS_Store
 Thumbs.db
 
-# Documentation & Audit Reports
-docs/
-documents/
-
 

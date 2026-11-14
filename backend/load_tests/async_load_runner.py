@@ -53,7 +53,12 @@ socket.gethostbyaddr = lambda ip: ("cdn.cloudflare.net", [], [ip])
 # Ensure backend root is on Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Isolate benchmark load tests from production database
+os.environ["DATABASE_URL"] = "sqlite:///./test_load_fraudshield.db"
+os.environ["ENVIRONMENT"] = "testing"
+
 from app.main import app
+from app.core.database import Base, engine
 from app.engines.threat_intelligence import threat_intelligence_aggregator
 from app.core.circuit_breaker import CircuitState
 
@@ -174,6 +179,7 @@ def worker_task(worker_id: int, request_ids: list[int]) -> list[dict]:
     return results
 
 def run_stress_test(total_requests: int = 100, concurrency: int = 10) -> dict:
+    Base.metadata.create_all(bind=engine)
     print("=================================================================", flush=True)
     print("   [FRAUDSHIELD AI] PRODUCTION LOAD & STRESS BENCHMARK RUNNER    ", flush=True)
     print(f"   Target: In-Process ASGI Engine | Concurrency: {concurrency} | Total: {total_requests}", flush=True)
@@ -187,10 +193,18 @@ def run_stress_test(total_requests: int = 100, concurrency: int = 10) -> dict:
     start_bench = time.perf_counter()
     results = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
-        futures = [executor.submit(worker_task, w_id, bucket) for w_id, bucket in enumerate(worker_buckets) if bucket]
-        for f in concurrent.futures.as_completed(futures):
-            results.extend(f.result())
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = [executor.submit(worker_task, w_id, bucket) for w_id, bucket in enumerate(worker_buckets) if bucket]
+            for f in concurrent.futures.as_completed(futures):
+                results.extend(f.result())
+    finally:
+        engine.dispose()
+        try:
+            if os.path.exists("./test_load_fraudshield.db"):
+                os.remove("./test_load_fraudshield.db")
+        except Exception:
+            pass
 
     total_duration = time.perf_counter() - start_bench
     latencies = [r["latency_ms"] for r in results]

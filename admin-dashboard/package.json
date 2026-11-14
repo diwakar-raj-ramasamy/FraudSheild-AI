@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "FraudShield AI - Cybersecurity Platform Admin Console",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

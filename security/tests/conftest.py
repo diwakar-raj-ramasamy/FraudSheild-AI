@@ -1,3 +1,4 @@
+import os
 import pytest
 import signal
 import asyncio
@@ -5,6 +6,10 @@ from datetime import timedelta
 import httpx
 from asyncio import proactor_events
 import anyio.to_thread
+
+# Isolate test database so test executions never touch or pollute production database
+os.environ["DATABASE_URL"] = "sqlite:///./test_runner_fraudshield.db"
+os.environ["ENVIRONMENT"] = "testing"
 
 # Sandbox compatibility patch for Windows IOCP loopback
 signal.set_wakeup_fd = lambda fd, *args, **kwargs: -1
@@ -105,6 +110,15 @@ def setup_database():
 
     db.commit()
     db.close()
+
+    yield
+
+    engine.dispose()
+    try:
+        if os.path.exists("./test_runner_fraudshield.db"):
+            os.remove("./test_runner_fraudshield.db")
+    except Exception:
+        pass
 
 @pytest.fixture
 def client():

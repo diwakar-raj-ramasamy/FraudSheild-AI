@@ -3,17 +3,26 @@ from app.core.config import settings
 from app.schemas import FindingItem, XAIFactor, RecommendedAction
 
 class ScoringEngine:
+    """
+    FraudShield AI Composite Risk Scoring Engine:
+    Calculates final composite threat score using the documented formula:
+      Final Score = min(100, 0.45 * Heuristic Score + 0.35 * ML Score + 0.20 * Intelligence Score)
+    with deterministic hard override conditions for verified critical hazards (Score >= 95).
+    """
+
     def __init__(self):
-        # Configurable signal contribution weights
-        self.WEIGHT_THREAT_INTEL = 30
-        self.WEIGHT_FAKE_LOGIN = 25
-        self.WEIGHT_TYPOSQUATTING = 20
-        self.WEIGHT_DANGEROUS_DOWNLOAD = 20
-        self.WEIGHT_MALICIOUS_REDIRECT = 15
-        self.WEIGHT_FINANCIAL_SCAM = 15
-        self.WEIGHT_INFRASTRUCTURE = 15
-        self.WEIGHT_XSS_INDICATOR = 10
-        self.WEIGHT_MALICIOUS_URL_SYNTAX = 15
+        # Component weights in documented composite formula
+        self.WEIGHT_HEURISTIC_RATIO = 0.45
+        self.WEIGHT_ML_RATIO = 0.35
+        self.WEIGHT_INTEL_RATIO = 0.20
+
+        # Heuristic sub-engine point contribution limits
+        self.PTS_FAKE_LOGIN = 45
+        self.PTS_TYPOSQUATTING = 35
+        self.PTS_URL_SYNTAX = 25
+        self.PTS_FINANCIAL_SCAM = 35
+        self.PTS_REDIRECT = 25
+        self.PTS_XSS = 20
 
     def calculate(
         self,
@@ -38,8 +47,9 @@ class ScoringEngine:
         xai_factors: List[XAIFactor] = []
         attack_types: List[str] = []
         recommended_actions: List[RecommendedAction] = []
-        
-        raw_score = 0
+
+        raw_heuristic_score = 0
+        intel_score = 0
         hard_override = False
         override_reason = None
 
@@ -48,7 +58,6 @@ class ScoringEngine:
             hard_override = True
             override_reason = f"Target verified in Centralized Threat Blocklist: {blocklist_reason}"
             attack_types.append("BLOCKLISTED_THREAT")
-            raw_score = 100
             findings.append(FindingItem(
                 rule_id="RULE-BLK-01",
                 title="Centralized Threat Blocklist Match",
@@ -62,32 +71,36 @@ class ScoringEngine:
                 rationale="Matches known verified malicious destination recorded in global threat defense database"
             ))
 
-        # --- 1. THREAT INTELLIGENCE SIGNAL ---
+        # --- 1. THREAT INTELLIGENCE COMPONENT (20% Weight) ---
         if threat_intel.get("overall_match"):
             conf = threat_intel.get("confidence", "low")
-            points = self.WEIGHT_THREAT_INTEL if conf != "high" else self.WEIGHT_THREAT_INTEL + 10
-            raw_score += points
+            if conf == "high":
+                intel_score = 100
+                hard_override = True
+                override_reason = "Confirmed positive match in authoritative threat intelligence feed"
+            elif conf == "medium":
+                intel_score = 75
+            else:
+                intel_score = 50
+
             attack_types.append("KNOWN_MALICIOUS_URL")
             findings.append(FindingItem(
                 rule_id="RULE-TI-01",
                 title="Threat Intelligence Match",
                 description=f"Flagged by external threat intelligence providers ({', '.join(threat_intel.get('matched_providers', []))})",
                 severity="CRITICAL",
-                contribution=points
+                contribution=int(intel_score * self.WEIGHT_INTEL_RATIO)
             ))
             xai_factors.append(XAIFactor(
                 factor="External Threat Intel Match",
-                weight=points,
+                weight=int(intel_score * self.WEIGHT_INTEL_RATIO),
                 rationale=f"Reported by external threat feeds with {conf} confidence"
             ))
-            if conf == "high":
-                hard_override = True
-                override_reason = "Confirmed positive match in authoritative threat intelligence feed"
 
-        # --- 2. FAKE LOGIN & CREDENTIAL HARVESTING ---
+        # --- 2. HEURISTIC: FAKE LOGIN & CREDENTIAL HARVESTING ---
         if fake_login_analysis.get("is_fake_login"):
-            points = self.WEIGHT_FAKE_LOGIN + (10 if fake_login_analysis.get("cross_domain_submission") else 0)
-            raw_score += points
+            points = self.PTS_FAKE_LOGIN + (15 if fake_login_analysis.get("cross_domain_submission") else 0)
+            raw_heuristic_score += points
             attack_types.append("FAKE_LOGIN_PAGE")
             attack_types.append("PHISHING")
             for ev in fake_login_analysis.get("evidence", []):
@@ -100,28 +113,29 @@ class ScoringEngine:
                 ))
             xai_factors.append(XAIFactor(
                 factor="Impersonated Credential Harvesting Form",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale="Detected authentication inputs on a domain spoofing official services"
             ))
             # Hard override if both brand spoofing and password form coincide
-            if fake_login_analysis.get("brand_spoofed"):
+            if fake_login_analysis.get("brand_spoofed") or typo_analysis.get("is_typosquatting"):
                 hard_override = True
-                override_reason = f"Credential form impersonating {fake_login_analysis.get('brand_spoofed').upper()}"
+                target_brand = fake_login_analysis.get("brand_spoofed") or typo_analysis.get("spoofed_brand") or "monitored brand"
+                override_reason = f"Credential form impersonating {str(target_brand).upper()}"
 
         elif fake_login_analysis.get("has_login_form"):
-            raw_score += 10
+            raw_heuristic_score += 15
             findings.append(FindingItem(
                 rule_id="RULE-FL-02",
                 title="Authentication Form Detected",
                 description="Webpage contains login or password entry fields",
                 severity="LOW",
-                contribution=10
+                contribution=15
             ))
 
-        # --- 3. TYPOSQUATTING & BRAND IMPERSONATION ---
+        # --- 3. HEURISTIC: TYPOSQUATTING & BRAND IMPERSONATION ---
         if typo_analysis.get("is_typosquatting"):
-            points = typo_analysis.get("risk_contribution", self.WEIGHT_TYPOSQUATTING)
-            raw_score += points
+            points = typo_analysis.get("risk_contribution", self.PTS_TYPOSQUATTING)
+            raw_heuristic_score += points
             attack_types.append("TYPOSQUATTING")
             for ev in typo_analysis.get("evidence", []):
                 findings.append(FindingItem(
@@ -133,14 +147,14 @@ class ScoringEngine:
                 ))
             xai_factors.append(XAIFactor(
                 factor=f"Typosquatting ({typo_analysis.get('technique')})",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale=f"Visual lookalike or brand embedding mimicking {typo_analysis.get('official_domain')}"
             ))
 
-        # --- 4. MALICIOUS URL STRUCTURE ---
+        # --- 4. HEURISTIC: MALICIOUS URL STRUCTURE ---
         if url_analysis.get("is_suspicious"):
-            points = min(url_analysis.get("risk_contribution", 15), 25)
-            raw_score += points
+            points = min(url_analysis.get("risk_contribution", self.PTS_URL_SYNTAX), 30)
+            raw_heuristic_score += points
             attack_types.append("MALICIOUS_URL_SYNTAX")
             for ev in url_analysis.get("evidence", []):
                 findings.append(FindingItem(
@@ -152,14 +166,14 @@ class ScoringEngine:
                 ))
             xai_factors.append(XAIFactor(
                 factor="Heuristic URL Syntax Anomaly",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale="Structural anomalies such as raw IP hostname, excessive length, or credential keywords"
             ))
 
-        # --- 5. FINANCIAL SCAM & SOCIAL ENGINEERING ---
+        # --- 5. HEURISTIC: FINANCIAL SCAM & SOCIAL ENGINEERING ---
         if financial_analysis.get("is_scam"):
-            points = financial_analysis.get("risk_contribution", self.WEIGHT_FINANCIAL_SCAM)
-            raw_score += points
+            points = financial_analysis.get("risk_contribution", self.PTS_FINANCIAL_SCAM)
+            raw_heuristic_score += points
             attack_types.append("FINANCIAL_SCAM")
             for ev in financial_analysis.get("evidence", []):
                 findings.append(FindingItem(
@@ -171,14 +185,14 @@ class ScoringEngine:
                 ))
             xai_factors.append(XAIFactor(
                 factor="Financial Scam Social Engineering",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale="Presence of high-pressure fraudulent patterns (e.g. crypto doubling, urgent KYC suspend)"
             ))
 
-        # --- 6. MALICIOUS REDIRECT BEHAVIOR ---
+        # --- 6. HEURISTIC: MALICIOUS REDIRECT BEHAVIOR ---
         if redirect_analysis.get("is_suspicious"):
-            points = redirect_analysis.get("risk_contribution", self.WEIGHT_MALICIOUS_REDIRECT)
-            raw_score += points
+            points = redirect_analysis.get("risk_contribution", self.PTS_REDIRECT)
+            raw_heuristic_score += points
             attack_types.append("MALICIOUS_REDIRECT")
             for ev in redirect_analysis.get("evidence", []):
                 findings.append(FindingItem(
@@ -190,14 +204,14 @@ class ScoringEngine:
                 ))
             xai_factors.append(XAIFactor(
                 factor="Multi-Hop Redirect Chain",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale="Complex or evasive redirect path preceding current landing page"
             ))
 
-        # --- 7. XSS INDICATORS ---
+        # --- 7. HEURISTIC: XSS INDICATORS ---
         if xss_analysis.get("has_indicator"):
-            points = xss_analysis.get("risk_contribution", self.WEIGHT_XSS_INDICATOR)
-            raw_score += points
+            points = xss_analysis.get("risk_contribution", self.PTS_XSS)
+            raw_heuristic_score += points
             attack_types.append("XSS_INDICATOR")
             findings.append(FindingItem(
                 rule_id="RULE-XSS-01",
@@ -208,14 +222,25 @@ class ScoringEngine:
             ))
             xai_factors.append(XAIFactor(
                 factor=f"Script Injection Marker ({xss_analysis.get('classification')})",
-                weight=points,
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
                 rationale="Presence of injection patterns or unsafe DOM sink manipulation without verified exploitation"
             ))
 
-        # --- 8. MACHINE LEARNING CONTRIBUTION ---
-        if ml_prediction_score > 0.6:
-            ml_points = int(ml_prediction_score * 20)
-            raw_score += ml_points
+        # --- 8. COMPOSITE HYBRID SCORE CALCULATION ---
+        # Formula: Final Score = min(100, 0.45 * Heuristic + 0.35 * ML + 0.20 * Intel)
+        norm_heuristic = min(max(raw_heuristic_score, 0), 100)
+        norm_ml = min(max(ml_prediction_score * 100.0, 0.0), 100.0)
+        norm_intel = min(max(float(intel_score), 0.0), 100.0)
+
+        composite_score = round(
+            (self.WEIGHT_HEURISTIC_RATIO * norm_heuristic) +
+            (self.WEIGHT_ML_RATIO * norm_ml) +
+            (self.WEIGHT_INTEL_RATIO * norm_intel)
+        )
+
+        # Append ML Factor attribution if probability is substantial
+        if norm_ml >= 40:
+            ml_points = round(self.WEIGHT_ML_RATIO * norm_ml)
             xai_factors.append(XAIFactor(
                 factor="Machine Learning Classifier Model",
                 weight=ml_points,
@@ -223,12 +248,14 @@ class ScoringEngine:
             ))
 
         # --- 9. FINAL SCORE AGGREGATION & OVERRIDE HANDLING ---
-        if hard_override:
-            final_score = min(max(raw_score, 90), 100)
+        if is_blocklist_hit:
+            final_score = 100
+        elif hard_override:
+            final_score = min(max(composite_score, 95), 100)
         else:
-            final_score = min(max(raw_score, 0), 100)
+            final_score = min(max(composite_score, 0), 100)
 
-        # Classification mapping
+        # Classification mapping (CRITICAL >= 60, CAUTION >= 25, SAFE < 25)
         if final_score >= settings.RISK_THRESHOLD_CRITICAL:
             classification = "CRITICAL"
         elif final_score >= settings.RISK_THRESHOLD_SAFE:
@@ -286,4 +313,3 @@ class ScoringEngine:
         }
 
 scoring_engine = ScoringEngine()
-

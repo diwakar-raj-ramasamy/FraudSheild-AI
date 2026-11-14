@@ -15,6 +15,29 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "fraudshield-super-secret-key-change-in-production-2026")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    @field_validator("SECRET_KEY", mode="after")
+    @classmethod
+    def validate_production_secret(cls, v: str) -> str:
+        """
+        Enforces cryptographic entropy in production environments.
+        Refuses to start if a default insecure key is used.
+        """
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if env == "production":
+            insecure_defaults = [
+                "fraudshield-super-secret-key-change-in-production-2026",
+                "secret",
+                "changeme",
+                "admin",
+                "password"
+            ]
+            if v in insecure_defaults or len(v) < 32:
+                raise ValueError(
+                    "SECURITY FATAL: Insecure or default SECRET_KEY detected in production environment! "
+                    "You must configure a high-entropy secret (minimum 32 bytes) via the SECRET_KEY environment variable."
+                )
+        return v
     
     # Database (defaults to local SQLite for zero-config run, supports PostgreSQL via env)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./fraudshield.db")
@@ -26,7 +49,12 @@ class Settings(BaseSettings):
         Anchors relative SQLite database paths to the project root directory
         so database access is 100% consistent regardless of execution working directory.
         """
-        if isinstance(v, str) and (v.startswith("sqlite:///./") or v == "sqlite:///fraudshield.db"):
+        if isinstance(v, str) and v.startswith("sqlite:///./"):
+            rel_file = v[len("sqlite:///./"):]
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            db_path = os.path.join(base_dir, rel_file).replace("\\", "/")
+            return f"sqlite:///{db_path}"
+        elif isinstance(v, str) and v == "sqlite:///fraudshield.db":
             base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
             db_path = os.path.join(base_dir, "fraudshield.db").replace("\\", "/")
             return f"sqlite:///{db_path}"
@@ -58,6 +86,13 @@ class Settings(BaseSettings):
     # File analysis
     MAX_FILE_SIZE_MB: int = 25
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
+
+    @field_validator("UPLOAD_DIR", mode="after")
+    @classmethod
+    def ensure_upload_dir_exists(cls, v: str) -> str:
+        """Ensures the upload directory exists with write permissions."""
+        os.makedirs(v, exist_ok=True)
+        return v
     
 settings = Settings()
 
