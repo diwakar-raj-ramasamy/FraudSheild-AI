@@ -84,6 +84,26 @@ class CorrelationService:
         db.add(event)
         db.commit()
 
+        # Broadcast live detection event to connected Admin Dashboards
+        if event_bus.active_connections:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(event_bus.broadcast({
+                    "type": "THREAT_DETECTED",
+                    "payload": {
+                        "event_id": event.id,
+                        "url": norm_url,
+                        "domain": domain,
+                        "risk_score": risk_score,
+                        "classification": classification,
+                        "attack_types": attack_types,
+                        "device_pseudonym": device_pseudonym,
+                        "title": page_title or f"Threat detection on {domain}"
+                    }
+                }))
+            except RuntimeError:
+                pass
+
         # 4. Scalable Multi-Device Correlation Check via Database Aggregation
         time_window = (datetime.now(timezone.utc) - timedelta(hours=settings.CAMPAIGN_WINDOW_HOURS)).replace(tzinfo=None)
 

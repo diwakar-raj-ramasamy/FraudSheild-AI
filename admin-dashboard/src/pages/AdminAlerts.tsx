@@ -9,6 +9,13 @@ export const AdminAlerts: React.FC = () => {
 
   useEffect(() => {
     loadAlerts();
+
+    // Real-time live telemetry listener: automatically refreshes alerts on live detection
+    const handleLiveAlertEvent = () => {
+      loadAlerts();
+    };
+    window.addEventListener("fraudshield_live_event", handleLiveAlertEvent);
+    return () => window.removeEventListener("fraudshield_live_event", handleLiveAlertEvent);
   }, []);
 
   async function loadAlerts() {

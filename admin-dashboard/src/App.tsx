@@ -70,25 +70,31 @@ export const App: React.FC = () => {
     const connectWs = () => {
       if (isCancelled) return;
       try {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
         const token = api.getAuthToken();
         const wsUrl = token
-          ? `ws://localhost:8000/api/ws/events?token=${encodeURIComponent(token)}`
-          : "ws://localhost:8000/api/ws/events";
+          ? `${protocol}//${host}/api/ws/events?token=${encodeURIComponent(token)}`
+          : `${protocol}//${host}/api/ws/events`;
 
         ws = new WebSocket(wsUrl);
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.type === "CAMPAIGN_DETECTED" || data.type === "THREAT_DETECTED") {
+            if (data.type === "CAMPAIGN_DETECTED" || data.type === "THREAT_DETECTED" || data.type === "SCAN_COMPLETED") {
               setLiveToast({
-                title: data.type === "CAMPAIGN_DETECTED" ? "Emerging Campaign Alert" : "Threat Intercepted",
-                message: data.payload?.domain || data.payload?.title || "New security event recorded.",
-                severity: data.payload?.risk_score >= 70 ? "CRITICAL" : "HIGH"
+                title: data.type === "CAMPAIGN_DETECTED"
+                  ? "Emerging Campaign Alert"
+                  : (data.payload?.risk_score || 0) >= 60
+                  ? "🚨 Critical Threat Intercepted"
+                  : "🛡️ Real-Time Telemetry Update",
+                message: data.payload?.domain || data.payload?.title || "Live security event recorded.",
+                severity: (data.payload?.risk_score || 0) >= 60 ? "CRITICAL" : "HIGH"
               });
-              setActiveAlertsCount((prev) => prev + 1);
-              if (data.type === "CAMPAIGN_DETECTED") {
-                setActiveCampaignsCount((prev) => prev + 1);
-              }
+              // Refresh badge counts in real time
+              refreshCounts();
+              // Broadcast to active pages
+              window.dispatchEvent(new CustomEvent("fraudshield_live_event", { detail: data }));
               setTimeout(() => setLiveToast(null), 6000);
             }
           } catch {

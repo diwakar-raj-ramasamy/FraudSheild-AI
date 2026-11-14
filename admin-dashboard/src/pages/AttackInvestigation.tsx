@@ -13,7 +13,8 @@ import {
   Info,
   Calendar,
   Layers,
-  ArrowRight
+  ArrowRight,
+  DownloadCloud
 } from "lucide-react";
 import { api } from "../services/api";
 import { InvestigationDossier } from "../types";
@@ -78,6 +79,20 @@ export const AttackInvestigation: React.FC<AttackInvestigationProps> = ({
     }
   }
 
+  function handleExportDossier() {
+    if (!dossier) return;
+    const str = JSON.stringify(dossier, null, 2);
+    const blob = new Blob([str], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Forensic-Dossier-${dossier.domain || "Target"}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -95,18 +110,28 @@ export const AttackInvestigation: React.FC<AttackInvestigationProps> = ({
         </div>
 
         {dossier && (
-          <button
-            onClick={handleAddToBlocklist}
-            disabled={blockSuccess}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition shadow-lg ${
-              blockSuccess
-                ? "bg-emerald-600 text-white cursor-default"
-                : "bg-red-600 hover:bg-red-500 text-white shadow-red-900/40"
-            }`}
-          >
-            {blockSuccess ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-            <span>{blockSuccess ? "Added to Global Blocklist" : "Add Target to Blocklist"}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportDossier}
+              className="flex items-center gap-2 px-3.5 py-2 bg-[#111A2E] hover:bg-slate-800 border border-[#1E2D4A] rounded-lg text-xs font-bold text-slate-200 transition shadow-md"
+            >
+              <DownloadCloud className="w-4 h-4 text-blue-400" />
+              <span>Export Dossier (JSON)</span>
+            </button>
+
+            <button
+              onClick={handleAddToBlocklist}
+              disabled={blockSuccess}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition shadow-lg ${
+                blockSuccess
+                  ? "bg-emerald-600 text-white cursor-default"
+                  : "bg-red-600 hover:bg-red-500 text-white shadow-red-900/40"
+              }`}
+            >
+              {blockSuccess ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+              <span>{blockSuccess ? "Added to Global Blocklist" : "Add Target to Blocklist"}</span>
+            </button>
+          </div>
         )}
       </div>
 

@@ -86,8 +86,10 @@ export const api = {
     return getAuthToken();
   },
 
-  // Metrics
+  // Metrics & Reports
   getMetricsOverview: () => fetchJson<MetricsOverviewResponse>("/metrics/overview"),
+  getSecurityReport: () => fetchJson<any>("/metrics/report"),
+  getThreatsExportUrl: () => `${API_BASE}/metrics/export-threats-csv`,
 
   // Threats & Investigation
   getThreats: (classification?: string) =>

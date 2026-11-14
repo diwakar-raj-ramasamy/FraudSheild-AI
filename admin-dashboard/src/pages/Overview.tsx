@@ -10,7 +10,9 @@ import {
   CheckCircle,
   ExternalLink,
   Flame,
-  ArrowRight
+  ArrowRight,
+  RefreshCw,
+  FileText
 } from "lucide-react";
 import {
   AreaChart,
@@ -41,9 +43,17 @@ export const Overview: React.FC<OverviewProps> = ({
   const [recentThreats, setRecentThreats] = useState<ThreatItem[]>([]);
   const [campaigns, setCampaigns] = useState<FraudCampaignItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportLoading, setReportLoading] = useState(false);
 
   useEffect(() => {
     loadOverviewData();
+
+    // Real-time live telemetry listener: automatically refreshes data on live events
+    const handleLiveTelemetry = () => {
+      loadOverviewData();
+    };
+    window.addEventListener("fraudshield_live_event", handleLiveTelemetry);
+    return () => window.removeEventListener("fraudshield_live_event", handleLiveTelemetry);
   }, []);
 
   async function loadOverviewData() {
@@ -63,35 +73,41 @@ export const Overview: React.FC<OverviewProps> = ({
     }
   }
 
+  async function handleDownloadReport() {
+    setReportLoading(true);
+    try {
+      const report = await api.getSecurityReport();
+      const reportStr = JSON.stringify(report, null, 2);
+      const blob = new Blob([reportStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${report.report_id || "FraudShield-Executive-Report"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Failed to export security report: " + (err.message || err));
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  // Strictly authentic zero-mock state defaults
   const metrics = data?.metrics || {
-    total_scans: 48,
-    threats_detected: 14,
-    critical_threats: 8,
-    threats_prevented: 26,
-    active_alerts: 2,
-    active_campaigns: 1,
-    files_analyzed: 4,
-    affected_devices: 3
+    total_scans: 0,
+    threats_detected: 0,
+    critical_threats: 0,
+    threats_prevented: 0,
+    active_alerts: 0,
+    active_campaigns: 0,
+    files_analyzed: 0,
+    affected_devices: 0
   };
 
-  const attackDistribution = data?.charts.attack_distribution || [
-    { name: "Phishing", value: 8 },
-    { name: "Fake Login", value: 6 },
-    { name: "Typosquatting", value: 5 },
-    { name: "Financial Scam", value: 4 },
-    { name: "Redirects", value: 3 },
-    { name: "Downloads", value: 2 }
-  ];
-
-  const timeline = data?.charts.timeline || [
-    { date: "Oct 28", scans: 12, threats: 2 },
-    { date: "Oct 29", scans: 18, threats: 3 },
-    { date: "Oct 30", scans: 25, threats: 5 },
-    { date: "Oct 31", scans: 32, threats: 4 },
-    { date: "Nov 01", scans: 28, threats: 6 },
-    { date: "Nov 02", scans: 40, threats: 7 },
-    { date: "Nov 03", scans: 48, threats: 8 }
-  ];
+  const attackDistribution = data?.charts.attack_distribution || [];
+  const timeline = data?.charts.timeline || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -103,12 +119,32 @@ export const Overview: React.FC<OverviewProps> = ({
             Real-time Browser Cyber Threat Intelligence & Multi-Device Endpoint Telemetry
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">Threat Correlation Engine:</span>
-          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            ACTIVE MONITORING
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadOverviewData}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111A2E] hover:bg-slate-800 border border-[#1E2D4A] rounded-lg text-xs text-slate-300 font-semibold transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-400" : ""}`} />
+            <span>Refresh</span>
+          </button>
+
+          <button
+            onClick={handleDownloadReport}
+            disabled={reportLoading}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-blue-900/30"
+          >
+            <DownloadCloud className={`w-3.5 h-3.5 ${reportLoading ? "animate-spin" : ""}`} />
+            <span>{reportLoading ? "Generating..." : "Export Executive Report"}</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs pl-2 border-l border-[#1E2D4A]">
+            <span className="text-slate-400 hidden sm:inline">Engine:</span>
+            <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              ACTIVE MONITORING
+            </span>
+          </div>
         </div>
       </div>
 

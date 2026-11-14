@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.utils.url_utils import normalize_url, extract_domain, compute_url_hash
 from app.models import URLRecord, ScanResult, BlocklistEntry, Device, InfrastructureRecord
 from app.schemas import ScanRequest, ScanResponse
+from app.core.event_bus import event_bus
 from app.engines.malicious_url_detector import malicious_url_detector
 from app.engines.typosquatting_detector import typosquatting_detector
 from app.engines.fake_login_detector import fake_login_detector
@@ -212,6 +214,25 @@ class ScanService:
                     db.rollback()
 
             db.commit()
+
+            # Real-time event bus broadcast for live dashboard telemetry
+            if event_bus.active_connections:
+                try:
+                    loop = asyncio.get_running_loop()
+                    event_payload = {
+                        "type": "THREAT_DETECTED" if score_result["risk_score"] >= 25 else "SCAN_COMPLETED",
+                        "payload": {
+                            "url": norm_url,
+                            "domain": domain,
+                            "risk_score": score_result["risk_score"],
+                            "classification": score_result["classification"],
+                            "attack_types": score_result["attack_types"],
+                            "title": req.page_title or f"Live Inspection of {domain}"
+                        }
+                    }
+                    loop.create_task(event_bus.broadcast(event_payload))
+                except Exception as b_ex:
+                    logger.debug(f"Event bus broadcast deferred: {b_ex}")
         except Exception as ex:
             db.rollback()
             logger.error(f"Failed to persist scan result to database: {ex}", exc_info=True)

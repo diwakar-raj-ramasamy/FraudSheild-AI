@@ -10,6 +10,13 @@ export const CampaignMonitor: React.FC = () => {
 
   useEffect(() => {
     loadCampaigns();
+
+    // Real-time live telemetry listener: automatically refreshes campaigns when correlation triggers
+    const handleLiveCampaignEvent = () => {
+      loadCampaigns();
+    };
+    window.addEventListener("fraudshield_live_event", handleLiveCampaignEvent);
+    return () => window.removeEventListener("fraudshield_live_event", handleLiveCampaignEvent);
   }, []);
 
   async function loadCampaigns() {

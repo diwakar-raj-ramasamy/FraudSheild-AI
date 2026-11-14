@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Search, Filter, ShieldAlert, ExternalLink, RefreshCw, Eye } from "lucide-react";
+import { Search, Filter, ShieldAlert, ExternalLink, RefreshCw, Eye, DownloadCloud } from "lucide-react";
 import { api } from "../services/api";
 import { ThreatItem } from "../types";
 import { RiskBadge } from "../components/RiskBadge";
@@ -16,6 +16,13 @@ export const ThreatDetectionCenter: React.FC<ThreatDetectionCenterProps> = ({ on
 
   useEffect(() => {
     loadThreats();
+
+    // Real-time live telemetry listener: refreshes list automatically on live threat detection
+    const handleLiveThreatEvent = () => {
+      loadThreats();
+    };
+    window.addEventListener("fraudshield_live_event", handleLiveThreatEvent);
+    return () => window.removeEventListener("fraudshield_live_event", handleLiveThreatEvent);
   }, [filterSeverity]);
 
   async function loadThreats() {
@@ -47,13 +54,24 @@ export const ThreatDetectionCenter: React.FC<ThreatDetectionCenterProps> = ({ on
             Real-time multi-signal security detections across monitored browser installations
           </p>
         </div>
-        <button
-          onClick={loadThreats}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111A2E] hover:bg-slate-800 border border-[#1E2D4A] rounded-lg text-xs text-slate-300 font-semibold transition"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadThreats}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111A2E] hover:bg-slate-800 border border-[#1E2D4A] rounded-lg text-xs text-slate-300 font-semibold transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
+
+          <a
+            href={api.getThreatsExportUrl()}
+            download
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 border border-blue-500/40 rounded-lg text-xs text-white font-bold transition shadow-md"
+          >
+            <DownloadCloud className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </a>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
