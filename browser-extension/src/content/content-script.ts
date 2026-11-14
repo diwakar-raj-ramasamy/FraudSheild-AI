@@ -1,5 +1,15 @@
 import { DomSignals, ScanResponse } from "../types";
-import { isInternalOrBrowserPage } from "../utils/url";
+
+function isInternalOrBrowserPage(url: string): boolean {
+  if (!url) return true;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("edge://") ||
+    url.startsWith("about:") ||
+    url.startsWith("view-source:")
+  );
+}
 
 // Safety check: do not inject into browser chrome or extension pages
 if (!isInternalOrBrowserPage(window.location.href)) {
