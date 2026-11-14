@@ -23,6 +23,7 @@ class ScoringEngine:
         self.PTS_FINANCIAL_SCAM = 35
         self.PTS_REDIRECT = 25
         self.PTS_XSS = 20
+        self.PTS_INFRASTRUCTURE = 25
 
     def calculate(
         self,
@@ -226,7 +227,25 @@ class ScoringEngine:
                 rationale="Presence of injection patterns or unsafe DOM sink manipulation without verified exploitation"
             ))
 
-        # --- 8. COMPOSITE HYBRID SCORE CALCULATION ---
+        # --- 8. HEURISTIC: INFRASTRUCTURE & SSRF RISK ---
+        if infrastructure_analysis.get("is_restricted_network"):
+            points = self.PTS_INFRASTRUCTURE
+            raw_heuristic_score += points
+            attack_types.append("RESTRICTED_INFRASTRUCTURE")
+            findings.append(FindingItem(
+                rule_id="RULE-INFRA-01",
+                title="Restricted Internal Infrastructure Target",
+                description=infrastructure_analysis.get("forensic_note", "Target resolves to a restricted loopback, private, or metadata IP"),
+                severity="HIGH",
+                contribution=points
+            ))
+            xai_factors.append(XAIFactor(
+                factor="Restricted Infrastructure Target",
+                weight=int(points * self.WEIGHT_HEURISTIC_RATIO),
+                rationale="Target resolves to internal or cloud metadata network infrastructure"
+            ))
+
+        # --- 9. COMPOSITE HYBRID SCORE CALCULATION ---
         # Formula: Final Score = min(100, 0.45 * Heuristic + 0.35 * ML + 0.20 * Intel)
         norm_heuristic = min(max(raw_heuristic_score, 0), 100)
         norm_ml = min(max(ml_prediction_score * 100.0, 0.0), 100.0)

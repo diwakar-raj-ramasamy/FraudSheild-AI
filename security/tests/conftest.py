@@ -46,10 +46,15 @@ class FastASGITransport(httpx.BaseTransport):
         status_code = 500
         response_headers = []
         response_body = []
+        body = request.read()
+        sent_body = False
 
         async def receive():
-            body = request.read()
-            return {'type': 'http.request', 'body': body, 'more_body': False}
+            nonlocal sent_body
+            if not sent_body:
+                sent_body = True
+                return {'type': 'http.request', 'body': body, 'more_body': False}
+            return {'type': 'http.disconnect'}
 
         async def send(message):
             nonlocal status_code

@@ -118,12 +118,19 @@ if (typeof chrome !== "undefined" && chrome.downloads && chrome.downloads.onCrea
       );
 
       if (result && result.risk_score >= 60) {
+        if (result.risk_score >= 80 && chrome.downloads && chrome.downloads.cancel) {
+          try {
+            chrome.downloads.cancel(downloadItem.id);
+          } catch (cancelErr) {
+            console.warn("Could not cancel dangerous download:", cancelErr);
+          }
+        }
         if (chrome.notifications && chrome.notifications.create) {
           chrome.notifications.create({
             type: "basic",
             iconUrl: "icons/icon-48.png",
-            title: "🛡️ FraudShield AI: Dangerous Download Detected",
-            message: `High risk detected in '${filename}': ${result.reasons?.[0] || 'Malicious executable pattern'}. Do not open this file!`,
+            title: result.risk_score >= 80 ? "🛡️ FraudShield AI: Dangerous Download Blocked" : "🛡️ FraudShield AI: Dangerous Download Detected",
+            message: `High risk detected in '${filename}': ${result.reasons?.[0] || 'Malicious executable pattern'}. ${result.risk_score >= 80 ? 'Download was automatically cancelled.' : 'Do not open this file!'}`,
             priority: 2
           });
         }
