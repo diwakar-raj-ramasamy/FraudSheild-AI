@@ -35,38 +35,53 @@ async function retrieveTabScan(tabId: number): Promise<ScanResponse | null> {
 }
 
 // Clean up stored state when tabs are closed
-chrome.tabs.onRemoved.addListener((tabId) => {
-  chrome.storage.local.remove([`tab_scan_${tabId}`]);
-});
+if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.onRemoved) {
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    try {
+      chrome.storage.local.remove([`tab_scan_${tabId}`]);
+    } catch {}
+  });
+}
 
 // 1. Initialize Extension Lifecycle
-chrome.runtime.onInstalled.addListener(async () => {
-  console.log("🛡️ FraudShield AI Extension initialized.");
-  await initLocalBlocklist();
-  await syncBlocklist();
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onInstalled) {
+  chrome.runtime.onInstalled.addListener(() => {
+    console.log("🛡️ FraudShield AI Extension initialized.");
+    initLocalBlocklist().catch((e) => console.warn("Local blocklist init notice:", e));
+    syncBlocklist().catch((e) => console.warn("Remote blocklist sync notice:", e));
 
-  // Set recurring alarm for blocklist sync every 30 minutes
-  chrome.alarms.create("sync_blocklist", { periodInMinutes: 30 });
-});
+    try {
+      if (chrome.alarms && chrome.alarms.create) {
+        chrome.alarms.create("sync_blocklist", { periodInMinutes: 30 });
+      }
+    } catch {}
+  });
+}
 
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "sync_blocklist") {
-    syncBlocklist();
-  }
-});
+if (typeof chrome !== "undefined" && chrome.alarms && chrome.alarms.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "sync_blocklist") {
+      syncBlocklist().catch((e) => console.warn("Periodic sync notice:", e));
+    }
+  });
+}
 
 // 2. Pre-Navigation Fast Local Blocklist Enforcement
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId !== 0) return;
-  const url = details.url;
-  if (isInternalOrBrowserPage(url)) return;
+if (typeof chrome !== "undefined" && chrome.webNavigation && chrome.webNavigation.onBeforeNavigate) {
+  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+    if (details.frameId !== 0) return;
+    const url = details.url;
+    if (isInternalOrBrowserPage(url)) return;
 
-  if (isLocallyBlocked(url)) {
-    console.warn(`🛡️ FraudShield AI: Blocking access to blocklisted destination: ${url}`);
-    const warningUrl = chrome.runtime.getURL(`src/warning/index.html?url=${encodeURIComponent(url)}`);
-    chrome.tabs.update(details.tabId, { url: warningUrl });
-  }
-});
+    if (isLocallyBlocked(url)) {
+      console.warn(`🛡️ FraudShield AI: Blocking access to blocklisted destination: ${url}`);
+      const warningUrl = chrome.runtime.getURL(`src/warning/index.html?url=${encodeURIComponent(url)}`);
+      if (chrome.tabs && chrome.tabs.update) {
+        chrome.tabs.update(details.tabId, { url: warningUrl });
+      }
+    }
+  });
+}
 
 // 3. Tab Badge Indicator
 function updateTabBadge(tabId: number, score: number, classification: string) {
@@ -166,11 +181,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             payload: scanResult
           }).catch(() => {});
         }
-        sendResponse({ status: "success", data: scanResult });
+        try {
+          sendResponse({ status: "success", data: scanResult });
+        } catch {}
       })
       .catch((err) => {
         console.error("Scan error:", err);
-        sendResponse({ status: "error", error: err.message });
+        try {
+          sendResponse({ status: "error", error: err.message });
+        } catch {}
       });
 
     return true; // Keep message channel open for async response
@@ -178,9 +197,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "GET_CURRENT_TAB_SCAN") {
     const reqTabId = message.tabId;
-    retrieveTabScan(reqTabId).then((scan) => {
-      sendResponse({ scan });
-    });
+    retrieveTabScan(reqTabId)
+      .then((scan) => {
+        try {
+          sendResponse({ scan });
+        } catch {}
+      })
+      .catch(() => {
+        try {
+          sendResponse({ scan: null });
+        } catch {}
+      });
     return true;
   }
 
@@ -189,12 +216,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const safeExitUrl = chrome.runtime.getURL(
       `src/safe-exit/index.html?url=${encodeURIComponent(targetUrl || "")}&attack=${encodeURIComponent(message.attack || "Phishing")}&score=${message.score || 90}`
     );
-    if (tabId) {
+    if (tabId && chrome.tabs && chrome.tabs.update) {
       chrome.tabs.update(tabId, { url: safeExitUrl });
-    } else {
+    } else if (chrome.tabs && chrome.tabs.create) {
       chrome.tabs.create({ url: safeExitUrl });
     }
-    sendResponse({ status: "navigating_to_safety" });
+    try {
+      sendResponse({ status: "navigating_to_safety" });
+    } catch {}
     return false;
   }
 });

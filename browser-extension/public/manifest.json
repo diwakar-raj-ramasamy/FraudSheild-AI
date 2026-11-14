@@ -4,11 +4,13 @@
   "version": "1.0.0",
   "description": "AI-Powered Browser Cyber Threat Detection, Prevention, Explainable AI & Safe Exit Protection",
   "permissions": [
-    "storage",
+    "tabs",
     "activeTab",
+    "storage",
     "webNavigation",
     "downloads",
-    "alarms"
+    "alarms",
+    "notifications"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

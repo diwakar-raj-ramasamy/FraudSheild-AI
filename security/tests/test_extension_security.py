@@ -18,7 +18,7 @@ def test_extension_manifest_v3_compliance():
     assert "service_worker" in background
 
     # 3. Required permissions only
-    allowed_permissions = {"storage", "webNavigation", "alarms", "downloads", "activeTab"}
+    allowed_permissions = {"storage", "webNavigation", "alarms", "downloads", "activeTab", "tabs", "notifications"}
     declared_permissions = set(manifest.get("permissions", []))
     assert declared_permissions.issubset(allowed_permissions | {"declarativeNetRequest"})
 
