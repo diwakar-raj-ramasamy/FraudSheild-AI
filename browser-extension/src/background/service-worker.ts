@@ -86,6 +86,7 @@ if (typeof chrome !== "undefined" && chrome.webNavigation && chrome.webNavigatio
 // 3. Tab Badge Indicator
 function updateTabBadge(tabId: number, score: number, classification: string) {
   try {
+    if (typeof chrome === "undefined" || !chrome.action || !chrome.action.setBadgeBackgroundColor) return;
     if (classification === "CRITICAL") {
       chrome.action.setBadgeBackgroundColor({ tabId, color: "#EF4444" });
       chrome.action.setBadgeText({ tabId, text: `${score}` });
@@ -102,35 +103,40 @@ function updateTabBadge(tabId: number, score: number, classification: string) {
 }
 
 // 4. Download Monitoring (Static metadata check for dangerous executable disguise patterns)
-chrome.downloads.onCreated.addListener(async (downloadItem) => {
-  const filename = downloadItem.filename || "";
-  const parts = filename.split('.');
-  const ext = parts.length > 1 ? `.${parts[parts.length - 1]}` : "";
+if (typeof chrome !== "undefined" && chrome.downloads && chrome.downloads.onCreated) {
+  chrome.downloads.onCreated.addListener(async (downloadItem) => {
+    const filename = downloadItem.filename || "";
+    const parts = filename.split('.');
+    const ext = parts.length > 1 ? `.${parts[parts.length - 1]}` : "";
 
-  try {
-    const result = await checkDownloadMetadata(
-      filename,
-      ext,
-      downloadItem.finalUrl || downloadItem.url,
-      downloadItem.mime || ""
-    );
+    try {
+      const result = await checkDownloadMetadata(
+        filename,
+        ext,
+        downloadItem.finalUrl || downloadItem.url,
+        downloadItem.mime || ""
+      );
 
-    if (result && result.risk_score >= 60) {
-      chrome.notifications?.create({
-        type: "basic",
-        iconUrl: "assets/shield-alert.png",
-        title: "🛡️ FraudShield AI: Dangerous Download Detected",
-        message: `High risk detected in '${filename}': ${result.reasons?.[0] || 'Malicious executable pattern'}. Do not open this file!`,
-        priority: 2
-      });
+      if (result && result.risk_score >= 60) {
+        if (chrome.notifications && chrome.notifications.create) {
+          chrome.notifications.create({
+            type: "basic",
+            iconUrl: "icons/icon-48.png",
+            title: "🛡️ FraudShield AI: Dangerous Download Detected",
+            message: `High risk detected in '${filename}': ${result.reasons?.[0] || 'Malicious executable pattern'}. Do not open this file!`,
+            priority: 2
+          });
+        }
+      }
+    } catch (err) {
+      console.error("FraudShield download check error:", err);
     }
-  } catch (err) {
-    console.error("FraudShield download check error:", err);
-  }
-});
+  });
+}
 
 // 5. Secure Message Dispatcher
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Validate message sender origin (Mitigates unauthorized cross-extension message injection)
   if (sender.id !== chrome.runtime.id) {
     console.warn("FraudShield AI: Rejected message from unauthorized sender:", sender.id);
@@ -227,3 +233,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 });
+}
